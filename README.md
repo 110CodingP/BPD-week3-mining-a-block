@@ -5,6 +5,10 @@ In this challenge, you are tasked with the simulation of mining process of a blo
 The repository contains a folder `mempool` which contains JSON files.
 These files represent individual transactions. Your goal is to successfully mine a block by including some of these transactions, following the specific requirements outlined below.
 
+> [!NOTE] 
+> You are only required to do basic validation checks. Signature validation is optional and is beyond the scope of this channel.
+
+
 ## Objective
 Your primary objective is to write a script that processes a series of transactions, validates them, and then mines them into a block. The output of your script should be a file named `out.txt` that follows a specific format.
 
