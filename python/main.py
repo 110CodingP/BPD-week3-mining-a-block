@@ -53,7 +53,7 @@ def main():
     input_ct = bytes.fromhex("01")
     txid_to_spend = bytes.fromhex("0000000000000000000000000000000000000000000000000000000000000000")
     idx_to_spend = bytes.fromhex("ffffffff")
-    block_ht = bytes.fromhex("01")
+    block_ht = bytes.fromhex("97040d")
     script_sig = pushbytes(block_ht) + block_ht
     sequence = bytes.fromhex("ffffffff")
 
@@ -61,7 +61,8 @@ def main():
         txid_to_spend + 
         idx_to_spend + 
         cmptSz(script_sig) + 
-        script_sig
+        script_sig +
+        sequence
     )
 
     witness_reserved_val = bytes.fromhex("0000000000000000000000000000000000000000000000000000000000000000")
@@ -74,7 +75,7 @@ def main():
     output_ct = bytes.fromhex("02")
     output1_amt_sats = (50*(10**8)).to_bytes(8,byteorder="little",signed=True)
     output1_spk = bytes.fromhex("76a914") + bytes.fromhex("3bc28d6d92d9073fb5e3adf481795eaf446bceed") + bytes.fromhex("88ac")
-    output2_amt_sats = bytes.fromhex("00000000")
+    output2_amt_sats = bytes.fromhex("0000000000000000")
     # if only coinbase txn is present
     witness_root_hash = bytes.fromhex("0000000000000000000000000000000000000000000000000000000000000000")
     output2_spk = bytes.fromhex("6a") + bytes.fromhex("24") + bytes.fromhex("aa21a9ed") + hash256(witness_root_hash + witness_reserved_val)
@@ -109,12 +110,12 @@ def main():
         output_ct + 
         outputs +
         locktime
-    )[::-1] # remember to reverse the txids
+    )[::-1] # remember to reverse to get the txids
 
     # construct the block
-    version = bytes.fromhex("01000000")
-    previousBlockHash = bytes.fromhex("0000000000000000000000000000000000000000000000000000000000000000")
-    merkle_root = bytes.fromhex("0000000000000000000000000000000000000000000000000000000000000000")
+    block_version = bytes.fromhex("00010000")
+    previousBlockHash = bytes.fromhex("0000fffe00000000000000000000000000000000000000000000000000000000")[::-1]
+    merkle_root = coinbase_txid[::-1]
     
     # timestamp
     timestamp = int(time.time()).to_bytes(4,byteorder="little",signed=False)
@@ -130,35 +131,37 @@ def main():
         if (int(difficulty[i:i+2],base=16)>=80):
             i-=2
         exp = (len(difficulty)-(i))//2
-        return exp.to_bytes(1,byteorder="little",signed=False) + bytes.fromhex(difficulty[i:i+6])
+        return  bytes.fromhex(difficulty[i+4:i+6]+difficulty[i+2:i+4]+difficulty[i:i+2]) + exp.to_bytes(1,byteorder="little",signed=False)
     
     # print(difficulty_to_bits("0000ffff00000000000000000000000000000000000000000000000000000000").hex())
     bits = difficulty_to_bits("0000ffff00000000000000000000000000000000000000000000000000000000")
 
     header_without_nonce = (
-        version + 
+        block_version + 
         previousBlockHash + 
         merkle_root +
         timestamp +
         bits
     )
     
-    header_hash = bytes.fromhex("0000000000000000000000000000000000010000000000000000000000000000")
+    nonce = bytes.fromhex("00000000")
 
     # nonce
-    found = False
-    exp = int((bits.hex())[:2],base=16)
-    target = int((bits.hex())[2:],base=16)<<exp
+    # found = False
+    # correct below code
+    # exp = int((bits.hex())[:2],base=16)
+    # target = int((bits.hex())[2:],base=16)<<exp
     # for random_num in range(4294967295+1):
     #     nonce = random_num.to_bytes(4,byteorder="little",signed=False)
     #     hash_val = hash256(header_without_nonce + nonce)
-    #     if (int(hash_val.hex(),base=16)<target):
+    #     if (int(hash_val.hex(),base=16)<exp = int((bits.hex())[:2],base=16)
+    # target = int((bits.hex())[2:],base=16)<<exptarget):
     #         found = True
     #         header_hash = hash_val
     #         break
     
     f = open("out.txt","w")
-    f.write(f"{header_hash.hex()}\n{coinbase.hex()}\n{coinbase_txid.hex()}")
+    f.write(f"{(header_without_nonce+nonce).hex()}\n{coinbase.hex()}\n{coinbase_txid.hex()}")
     f.close()
 
 
@@ -180,4 +183,5 @@ References:
 - version 2 is not required for segwit
 - getting the unix epoch time : https://stackoverflow.com/questions/16755394/what-is-the-easiest-way-to-get-current-gmt-time-in-unix-timestamp-format
 - target to bits : https://learnmeabitcoin.com/technical/block/bits/#target-to-bits
+- minimum block version: https://learnmeabitcoin.com/technical/block/version/#version-numbers
 """
