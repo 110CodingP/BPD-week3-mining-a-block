@@ -59,7 +59,29 @@ def main():
     # selecting transactions (need to take care of block wt)
     txids = []
 
-    # creating the coinbase txn
+    files = []
+    f = open("./mempool/mempool.json","r")
+    data = json.load(f)
+    f.close()
+
+    for file in data:
+        files.append(file)
+    
+    def add(txids,file):
+        pass
+
+    bits = difficulty_to_bits("0000ffff00000000000000000000000000000000000000000000000000000000")
+    def find_target(bits):
+        bits = bits[::-1]
+        bits = bits.hex()
+        exp = int(bits[:2],base=16)
+        base = int(bits[2:],base=16)<<(8*(exp-3))
+        base = base.to_bytes(32,"big",signed=False)
+        return base
+
+    target = find_target(bits)
+    found = False
+
     def find_wtxids(txids):
         wtxids = []
         for txid in txids:
@@ -69,11 +91,7 @@ def main():
             wtxid = hash256(bytes.fromhex(data["hex"]))
             wtxids.append(wtxid)
         return wtxids
-
-    wtxids = [bytes.fromhex("0000000000000000000000000000000000000000000000000000000000000000")]
-
-    wtxids = wtxids + find_wtxids(txids)
-
+    
     def find_root(txids):
         level = [txid[::-1] for txid in txids]
 
@@ -85,11 +103,8 @@ def main():
                 else:
                     next_level.append(hash256(level[i]+level[i+1]))
             level = next_level
-        
+    
         return level[0]
-
-
-    witness_root_hash = find_root(wtxids)
 
     def create_coinbase(witness_root_hash):
         version = bytes.fromhex("01000000")
@@ -157,34 +172,15 @@ def main():
             locktime
         )[::-1] # remember to reverse to get the txids
         return [coinbase, coinbase_txid]
-
-    coinbase, coinbase_txid = create_coinbase(witness_root_hash)
-
-
     
-    # construct the block
-      # bits
-    bits = difficulty_to_bits("0000ffff00000000000000000000000000000000000000000000000000000000")
-    def find_target(bits):
-        bits = bits[::-1]
-        bits = bits.hex()
-        exp = int(bits[:2],base=16)
-        base = int(bits[2:],base=16)<<(8*(exp-3))
-        base = base.to_bytes(32,"big",signed=False)
-        return base
-
-    target = find_target(bits)
-
-      # find magic nonce
-    def find_nonce(header_without_nonce, bits,target):
-        for nonce in range():
-            if (hash256(header_without_nonce + nonce) < target ):
+    # find magic nonce
+    def find_nonce(header_without_nonce, target):
+        for nonce in range(4294967295+1):
+            print(nonce)
+            if (hash256(header_without_nonce + nonce.to_bytes(4,"little",signed=False)) <= target ):
                 return [True, nonce]
         return [False, nonce]
-
-    txids = [coinbase_txid] + txids
-    merkle_root = find_root(txids)
-
+    
     def create_block(merkle_root, bits, target):
         block_version = bytes.fromhex("00010000")
         previousBlockHash = bytes.fromhex("0000fffe00000000000000000000000000000000000000000000000000000000")[::-1]
@@ -199,11 +195,26 @@ def main():
             timestamp +
             bits
         )
-        found, nonce = find_nonce(header_without_nonce,bits, target)
+        found, nonce = find_nonce(header_without_nonce,target)
         return [found,header_without_nonce+nonce]
     
-    
-    found, block_header = create_block(merkle_root,bits, target)
+    # mine
+    while (found == False):
+
+        # some kind of add transaction function
+        txids = add()
+        wtxids = [bytes.fromhex("0000000000000000000000000000000000000000000000000000000000000000")]
+        wtxids = wtxids + find_wtxids(txids)
+        witness_root_hash = find_root(wtxids)
+
+
+        coinbase, coinbase_txid = create_coinbase(witness_root_hash)
+
+
+        txids = [coinbase_txid] + txids
+        merkle_root = find_root(txids)
+
+        found, block_header = create_block(merkle_root,bits, target)
     
     # output
     f = open("out.txt","w")
@@ -233,4 +244,5 @@ References:
 - minimum block version: https://learnmeabitcoin.com/technical/block/version/#version-numbers
 - "The TXIDs should be input in reverse byte order (as they appear on blockchain explorers), but they are converted to natural byte order before the merkle root is calculated.": learmeabitcoin
 - finding merkle root : ../test/helper.ts
+- bits to target: https://learnmeabitcoin.com/technical/block/bits/#bits-to-target
 """
