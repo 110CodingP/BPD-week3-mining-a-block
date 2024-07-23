@@ -175,7 +175,7 @@ def main():
     def find_nonce(header_without_nonce, target):
         for nonce in range(4294967295+1):
             print(nonce)
-            if (hash256(header_without_nonce + nonce.to_bytes(4,"little",signed=False)) <= target ):
+            if (hash256(header_without_nonce + nonce.to_bytes(4,"little",signed=False))[::-1] <= target ):
                 return [True, nonce]
         return [False, nonce]
     
