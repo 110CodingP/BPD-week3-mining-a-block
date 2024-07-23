@@ -57,7 +57,6 @@ def main():
             return  bytes.fromhex(difficulty[i+4:i+6]+difficulty[i+2:i+4]+difficulty[i:i+2]) + exp.to_bytes(1,byteorder="little",signed=False)
 
     # selecting transactions (need to take care of block wt)
-    txids = []
 
     files = []
     f = open("./mempool/mempool.json","r")
@@ -67,7 +66,7 @@ def main():
     for file in data:
         files.append(file)
     
-    def add(txids,file):
+    def add():
         pass
 
     bits = difficulty_to_bits("0000ffff00000000000000000000000000000000000000000000000000000000")
@@ -80,7 +79,6 @@ def main():
         return base
 
     target = find_target(bits)
-    found = False
 
     def find_wtxids(txids):
         wtxids = []
@@ -196,13 +194,13 @@ def main():
             bits
         )
         found, nonce = find_nonce(header_without_nonce,target)
-        return [found,header_without_nonce+nonce]
+        return [found,header_without_nonce+nonce.to_bytes(4,"little",signed=False)]
     
     # mine
+    found = False
     while (found == False):
-
+        txids = []
         # some kind of add transaction function
-        txids = add()
         wtxids = [bytes.fromhex("0000000000000000000000000000000000000000000000000000000000000000")]
         wtxids = wtxids + find_wtxids(txids)
         witness_root_hash = find_root(wtxids)
@@ -218,10 +216,10 @@ def main():
     
     # output
     f = open("out.txt","w")
+    txids = [txid.hex() for txid in txids]
     txids = '\n'.join(txids)
-    f.write(f"{block_header}\n{coinbase}\n{txids}")
+    f.write(f"{block_header.hex()}\n{coinbase.hex()}\n{txids}")
     f.close()
-
 
     
 
