@@ -70,6 +70,8 @@ def main():
             f = open(f"./mempool/{txid}.json","r")
             data = json.load(f)
             f.close()
+            wtxid = hash256(bytes.fromhex(data["hex"]))
+            wtxids.append(wtxid)
         return wtxids
 
     wtxids = [bytes.fromhex("0000000000000000000000000000000000000000000000000000000000000000")]
