@@ -56,12 +56,8 @@ def main():
             exp = (len(difficulty)-(i))//2
             return  bytes.fromhex(difficulty[i+4:i+6]+difficulty[i+2:i+4]+difficulty[i:i+2]) + exp.to_bytes(1,byteorder="little",signed=False)
 
-
-
-
     # selecting transactions (need to take care of block wt)
     txids = []
-
 
     # creating the coinbase txn
     def find_wtxids(txids):
@@ -160,7 +156,7 @@ def main():
             outputs +
             locktime
         )[::-1] # remember to reverse to get the txids
-        return {coinbase, coinbase_txid}
+        return [coinbase, coinbase_txid]
 
     coinbase, coinbase_txid = create_coinbase(witness_root_hash)
 
@@ -169,15 +165,27 @@ def main():
     # construct the block
       # bits
     bits = difficulty_to_bits("0000ffff00000000000000000000000000000000000000000000000000000000")
+    def find_target(bits):
+        bits = bits[::-1]
+        bits = bits.hex()
+        exp = int(bits[:2],base=16)
+        base = int(bits[2:],base=16)<<(8*(exp-3))
+        base = base.to_bytes(32,"big",signed=False)
+        return base
+
+    target = find_target(bits)
 
       # find magic nonce
-    def find_nonce(header_without_nonce, bits):
-        pass
+    def find_nonce(header_without_nonce, bits,target):
+        for nonce in range():
+            if (hash256(header_without_nonce + nonce) < target ):
+                return [True, nonce]
+        return [False, nonce]
 
     txids = [coinbase_txid] + txids
     merkle_root = find_root(txids)
 
-    def create_block(merkle_root, bits):
+    def create_block(merkle_root, bits, target):
         block_version = bytes.fromhex("00010000")
         previousBlockHash = bytes.fromhex("0000fffe00000000000000000000000000000000000000000000000000000000")[::-1]
     
@@ -191,11 +199,11 @@ def main():
             timestamp +
             bits
         )
-        nonce = find_nonce(header_without_nonce,bits)
-        return header_without_nonce+nonce
+        found, nonce = find_nonce(header_without_nonce,bits, target)
+        return [found,header_without_nonce+nonce]
     
     
-    block_header = create_block(merkle_root,bits)
+    found, block_header = create_block(merkle_root,bits, target)
     
     # output
     f = open("out.txt","w")
