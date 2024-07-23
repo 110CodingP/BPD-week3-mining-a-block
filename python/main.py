@@ -59,7 +59,7 @@ def main():
 
 
 
-    # selecting transactions (need to take care of block wait)
+    # selecting transactions (need to take care of block wt)
     txids = []
 
 
