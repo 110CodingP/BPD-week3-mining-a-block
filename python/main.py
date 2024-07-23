@@ -65,7 +65,12 @@ def main():
 
     # creating the coinbase txn
     def find_wtxids(txids):
-        pass
+        wtxids = []
+        for txid in txids:
+            f = open(f"./mempool/{txid}.json","r")
+            data = json.load(f)
+            f.close()
+        return wtxids
 
     wtxids = [bytes.fromhex("0000000000000000000000000000000000000000000000000000000000000000")]
 
