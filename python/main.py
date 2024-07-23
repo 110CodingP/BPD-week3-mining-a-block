@@ -2,6 +2,7 @@
 Clarifications:
 - do we need to check whether ancestors are included and double spends, RBF?
 - do we have to maximize the fee?
+- are the filenames the txids?
 """
 
 """
@@ -43,125 +44,156 @@ def main():
     def hash256(data:bytes)->bytes:
         return hashlib.sha256(hashlib.sha256(data).digest()).digest()
     
-    # selecting transactions
-    
-    # creating the coinbase txn
-    version = bytes.fromhex("01000000")
-    marker = bytes.fromhex("00")
-    flag = bytes.fromhex("01")
-
-    input_ct = bytes.fromhex("01")
-    txid_to_spend = bytes.fromhex("0000000000000000000000000000000000000000000000000000000000000000")
-    idx_to_spend = bytes.fromhex("ffffffff")
-    block_ht = bytes.fromhex("97040d")
-    script_sig = pushbytes(block_ht) + block_ht
-    sequence = bytes.fromhex("ffffffff")
-
-    inputs = (
-        txid_to_spend + 
-        idx_to_spend + 
-        cmptSz(script_sig) + 
-        script_sig +
-        sequence
-    )
-
-    witness_reserved_val = bytes.fromhex("0000000000000000000000000000000000000000000000000000000000000000")
-    witness = (
-        bytes.fromhex("01") + 
-        pushbytes(witness_reserved_val) + 
-        witness_reserved_val
-    )
-
-    output_ct = bytes.fromhex("02")
-    output1_amt_sats = (50*(10**8)).to_bytes(8,byteorder="little",signed=True)
-    output1_spk = bytes.fromhex("76a914") + bytes.fromhex("3bc28d6d92d9073fb5e3adf481795eaf446bceed") + bytes.fromhex("88ac")
-    output2_amt_sats = bytes.fromhex("0000000000000000")
-    # if only coinbase txn is present
-    witness_root_hash = bytes.fromhex("0000000000000000000000000000000000000000000000000000000000000000")
-    output2_spk = bytes.fromhex("6a") + bytes.fromhex("24") + bytes.fromhex("aa21a9ed") + hash256(witness_root_hash + witness_reserved_val)
-
-    outputs = (
-        output1_amt_sats +
-        cmptSz(output1_spk) + 
-        output1_spk + 
-        output2_amt_sats + 
-        cmptSz(output2_spk) + 
-        output2_spk
-    )
-
-    locktime = bytes.fromhex("00000000")
-
-    coinbase = (
-        version + 
-        marker + 
-        flag + 
-        input_ct + 
-        inputs + 
-        output_ct + 
-        outputs + 
-        witness + 
-        locktime
-    )
-
-    coinbase_txid = hash256(
-        version +
-        input_ct +
-        inputs + 
-        output_ct + 
-        outputs +
-        locktime
-    )[::-1] # remember to reverse to get the txids
-
-    # construct the block
-    block_version = bytes.fromhex("00010000")
-    previousBlockHash = bytes.fromhex("0000fffe00000000000000000000000000000000000000000000000000000000")[::-1]
-    merkle_root = coinbase_txid[::-1]
-    
-    # timestamp
-    timestamp = int(time.time()).to_bytes(4,byteorder="little",signed=False)
-
-    # bits
     def difficulty_to_bits(difficulty:str)->bytes:
-        exp = 0
-        for i in range(len(difficulty)):
-            if difficulty[i]!='0':
-                break
-        if (i%2!=0):
-            i-=1
-        if (int(difficulty[i:i+2],base=16)>=80):
-            i-=2
-        exp = (len(difficulty)-(i))//2
-        return  bytes.fromhex(difficulty[i+4:i+6]+difficulty[i+2:i+4]+difficulty[i:i+2]) + exp.to_bytes(1,byteorder="little",signed=False)
+            exp = 0
+            for i in range(len(difficulty)):
+                if difficulty[i]!='0':
+                    break
+            if (i%2!=0):
+                i-=1
+            if (int(difficulty[i:i+2],base=16)>=80):
+                i-=2
+            exp = (len(difficulty)-(i))//2
+            return  bytes.fromhex(difficulty[i+4:i+6]+difficulty[i+2:i+4]+difficulty[i:i+2]) + exp.to_bytes(1,byteorder="little",signed=False)
+
+
+
+
+    # selecting transactions (need to take care of block wait)
+    txids = []
+
+
+    # creating the coinbase txn
+    def find_wtxids(txids):
+        pass
+
+    wtxids = [bytes.fromhex("0000000000000000000000000000000000000000000000000000000000000000")]
+
+    wtxids = wtxids + find_wtxids(txids)
+
+    def find_root(txids):
+        level = [txid[::-1] for txid in txids]
+
+        while (len(level)>=2):
+            next_level = []
+            for i in range(0,len(level),2):
+                if (i+1 == len(level)):
+                    next_level.append(hash256(level[i]+level[i]))
+                else:
+                    next_level.append(hash256(level[i]+level[i+1]))
+            level = next_level
+        
+        return level[0]
+
+
+    witness_root_hash = find_root(wtxids)
+
+    def create_coinbase(witness_root_hash):
+        version = bytes.fromhex("01000000")
+        marker = bytes.fromhex("00")
+        flag = bytes.fromhex("01")
+
+        input_ct = bytes.fromhex("01")
+        txid_to_spend = bytes.fromhex("0000000000000000000000000000000000000000000000000000000000000000")
+        idx_to_spend = bytes.fromhex("ffffffff")
+        block_ht = bytes.fromhex("97040d")
+        script_sig = pushbytes(block_ht) + block_ht
+        sequence = bytes.fromhex("ffffffff")
+
+        inputs = (
+            txid_to_spend + 
+            idx_to_spend + 
+            cmptSz(script_sig) + 
+            script_sig +
+            sequence
+        )
+
+        witness_reserved_val = bytes.fromhex("0000000000000000000000000000000000000000000000000000000000000000")
+        witness = (
+            bytes.fromhex("01") + 
+            pushbytes(witness_reserved_val) + 
+            witness_reserved_val
+        )
+
+        output_ct = bytes.fromhex("02")
+        output1_amt_sats = (50*(10**8)).to_bytes(8,byteorder="little",signed=True)
+        output1_spk = bytes.fromhex("76a914") + bytes.fromhex("3bc28d6d92d9073fb5e3adf481795eaf446bceed") + bytes.fromhex("88ac")
+        output2_amt_sats = bytes.fromhex("0000000000000000")
+
+        output2_spk = bytes.fromhex("6a") + bytes.fromhex("24") + bytes.fromhex("aa21a9ed") + hash256(witness_root_hash + witness_reserved_val)
+
+        outputs = (
+            output1_amt_sats +
+            cmptSz(output1_spk) + 
+            output1_spk + 
+            output2_amt_sats + 
+            cmptSz(output2_spk) + 
+            output2_spk
+        )
+
+        locktime = bytes.fromhex("00000000")
+
+        coinbase = (
+            version + 
+            marker + 
+            flag + 
+            input_ct + 
+            inputs + 
+            output_ct + 
+            outputs + 
+            witness + 
+            locktime
+        )
+
+        coinbase_txid = hash256(
+            version +
+            input_ct +
+            inputs + 
+            output_ct + 
+            outputs +
+            locktime
+        )[::-1] # remember to reverse to get the txids
+        return {coinbase, coinbase_txid}
+
+    coinbase, coinbase_txid = create_coinbase(witness_root_hash)
+
+
     
-    # print(difficulty_to_bits("0000ffff00000000000000000000000000000000000000000000000000000000").hex())
+    # construct the block
+      # bits
     bits = difficulty_to_bits("0000ffff00000000000000000000000000000000000000000000000000000000")
 
-    header_without_nonce = (
-        block_version + 
-        previousBlockHash + 
-        merkle_root +
-        timestamp +
-        bits
-    )
-    
-    nonce = bytes.fromhex("00000000")
+      # find magic nonce
+    def find_nonce(header_without_nonce, bits):
+        pass
 
-    # nonce
-    # found = False
-    # correct below code
-    # exp = int((bits.hex())[:2],base=16)
-    # target = int((bits.hex())[2:],base=16)<<exp
-    # for random_num in range(4294967295+1):
-    #     nonce = random_num.to_bytes(4,byteorder="little",signed=False)
-    #     hash_val = hash256(header_without_nonce + nonce)
-    #     if (int(hash_val.hex(),base=16)<exp = int((bits.hex())[:2],base=16)
-    # target = int((bits.hex())[2:],base=16)<<exptarget):
-    #         found = True
-    #         header_hash = hash_val
-    #         break
+    txids = [coinbase_txid] + txids
+    merkle_root = find_root(txids)
+
+    def create_block(merkle_root, bits):
+        block_version = bytes.fromhex("00010000")
+        previousBlockHash = bytes.fromhex("0000fffe00000000000000000000000000000000000000000000000000000000")[::-1]
     
+        # timestamp
+        timestamp = int(time.time()).to_bytes(4,byteorder="little",signed=False)
+
+        header_without_nonce = (
+            block_version + 
+            previousBlockHash + 
+            merkle_root +
+            timestamp +
+            bits
+        )
+        nonce = find_nonce(header_without_nonce,bits)
+        return header_without_nonce+nonce
+    
+    
+    block_header = create_block(merkle_root,bits)
+    
+    # output
     f = open("out.txt","w")
-    f.write(f"{(header_without_nonce+nonce).hex()}\n{coinbase.hex()}\n{coinbase_txid.hex()}")
+    txids = '\n'.join(txids)
+    f.write(f"{block_header}\n{coinbase}\n{txids}")
     f.close()
 
 
@@ -184,4 +216,6 @@ References:
 - getting the unix epoch time : https://stackoverflow.com/questions/16755394/what-is-the-easiest-way-to-get-current-gmt-time-in-unix-timestamp-format
 - target to bits : https://learnmeabitcoin.com/technical/block/bits/#target-to-bits
 - minimum block version: https://learnmeabitcoin.com/technical/block/version/#version-numbers
+- "The TXIDs should be input in reverse byte order (as they appear on blockchain explorers), but they are converted to natural byte order before the merkle root is calculated.": learmeabitcoin
+- finding merkle root : ../test/helper.ts
 """
