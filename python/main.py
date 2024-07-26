@@ -64,7 +64,22 @@ def main():
     f.close()
 
     def validate(file):
-        return True
+        """
+        Check if the sum of outputs is less than sum of inputs
+        """
+        input_sum = 0
+        output_sum = 0
+        f = open(f"./mempool/{file}.json","r")
+        data = json.load(f)
+        f.close()
+
+        for input in data["vin"]:
+            input_sum += input["prevout"]["value"]
+        
+        for output in data["vout"]:
+            output_sum += output["value"]
+        
+        return input_sum >= output_sum
 
     def add(txids,added,file,vout):
         """
@@ -230,16 +245,14 @@ def main():
     added = {}
     idx = 0
     coinbase_txid = bytes.fromhex("0000000000000000000000000000000000000000000000000000000000000000")
-    while (found == False and idx<len(files)):
+    while ((found == False or len(txids)<1) and idx<len(files)):
         is_added = False
         while(idx<len(files) and files[idx] in txids):
             idx+=1
         if (idx<len(files)):
             txids, added, is_added= add(txids,added,files[idx],-1)
-        if not is_added:
-            idx+=1
+        idx+=1
 
-        # do a check for block wt eject some transactions from the end till block wt is correct(need to update idx)
         # some kind of add transaction function
         wtxids = [bytes.fromhex("0000000000000000000000000000000000000000000000000000000000000000")]
         wtxids = wtxids + find_wtxids(txids)
