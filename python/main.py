@@ -8,12 +8,12 @@ Clarifications:
 """
 Approach
 - select transactions
+  - in each iteration add the current transaction and its ancestors if not been added and are valid
 - construct the coinbase transaction
 - create block header
 """
 
 import json
-import queue
 import time
 import hashlib
 
@@ -60,14 +60,42 @@ def main():
 
     files = []
     f = open("./mempool/mempool.json","r")
-    data = json.load(f)
+    files = json.load(f)
     f.close()
 
-    for file in data:
-        files.append(file)
-    
-    def add():
-        pass
+    def validate(file):
+        return True
+
+    def add(txids,added,file,vout):
+        """
+          if it does not exist in mempool assume it is valid
+          if it has already been added but with different vout then return
+          if already been added but with same vout this is a case of double spend, do not include it or its descendants
+          if not been included then first include parent if valid, now do validity check
+            - if valid then add to txids and added
+            - if not valid then do not add it or its descendants
+        """
+        if not file in files:
+            return txids,added,True
+        if file in txids and added[file]!=vout:
+            return txids,added,True
+        elif file in txids:
+            return txids,added,False
+        else:
+            f = open(f"./mempool/{file}.json","r")
+            data = json.load(f)
+            f.close()
+            for input in data["vin"]:
+                txids,added,is_added = add(txids,added,input["txid"],input["vout"])
+                if not is_added:
+                    return txids,added,False
+            if not validate(file):
+                return txids,added,False
+            txids.append(file)
+            added[file]=vout
+            return txids,added,True
+            
+
 
     bits = difficulty_to_bits("0000ffff00000000000000000000000000000000000000000000000000000000")
     def find_target(bits):
@@ -86,7 +114,7 @@ def main():
             f = open(f"./mempool/{txid}.json","r")
             data = json.load(f)
             f.close()
-            wtxid = hash256(bytes.fromhex(data["hex"]))
+            wtxid = hash256(bytes.fromhex(data["hex"]))[::-1]
             wtxids.append(wtxid)
         return wtxids
     
@@ -198,8 +226,20 @@ def main():
     
     # mine
     found = False
-    while (found == False):
-        txids = []
+    txids = []
+    added = {}
+    idx = 0
+    coinbase_txid = bytes.fromhex("0000000000000000000000000000000000000000000000000000000000000000")
+    while (found == False and idx<len(files)):
+        is_added = False
+        while(idx<len(files) and files[idx] in txids):
+            idx+=1
+        if (idx<len(files)):
+            txids, added, is_added= add(txids,added,files[idx],-1)
+        if not is_added:
+            idx+=1
+
+        # do a check for block wt eject some transactions from the end till block wt is correct(need to update idx)
         # some kind of add transaction function
         wtxids = [bytes.fromhex("0000000000000000000000000000000000000000000000000000000000000000")]
         wtxids = wtxids + find_wtxids(txids)
@@ -207,16 +247,14 @@ def main():
 
 
         coinbase, coinbase_txid = create_coinbase(witness_root_hash)
-
-
-        txids = [coinbase_txid] + txids
-        merkle_root = find_root(txids)
+        tmp_txids = [coinbase_txid] + [bytes.fromhex(txid) for txid in txids]
+        merkle_root = find_root(tmp_txids)
 
         found, block_header = create_block(merkle_root,bits, target)
     
     # output
     f = open("out.txt","w")
-    txids = [txid.hex() for txid in txids]
+    txids = [coinbase_txid.hex()] + txids
     txids = '\n'.join(txids)
     f.write(f"{block_header.hex()}\n{coinbase.hex()}\n{txids}")
     f.close()
